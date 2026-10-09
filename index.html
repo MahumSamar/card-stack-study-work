@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Latest Work — Card Stack Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fbfbfb;
+    --ink: #1c1c1c;
+    --mute: #c6c6c6;
+    --pad-x: 38px;
+    --pad-y: 38px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    overscroll-behavior: none;
+  }
+
+  body {
+    font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ---------- Section ---------- */
+  .work {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 420px;
+    overflow: hidden;
+    background: var(--bg);
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+  }
+
+  .work__stage {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    cursor: default;
+  }
+  .work[data-mode="slider"] .work__stage { cursor: grab; }
+  .work[data-mode="slider"].is-dragging .work__stage { cursor: grabbing; }
+
+  /* ---------- Chrome (header / footer) ---------- */
+  .work__bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--pad-x);
+    line-height: 1;
+    pointer-events: none;
+  }
+  .work__bar--top { top: var(--pad-y); height: 16px; z-index: 1; }
+  .work__bar--bottom { bottom: calc(var(--pad-y) - 7px); height: 30px; z-index: 5; }
+
+  .work__name { color: var(--ink); }
+  .work__label { color: var(--mute); }
+
+  .work__hint {
+    color: var(--mute);
+    transition: opacity .45s ease;
+  }
+  .work:not([data-mode="stack"]) .work__hint { opacity: 0; }
+  .work__hint .is-touch { display: none; }
+
+  .work__controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-left: auto;
+    pointer-events: auto;
+  }
+
+  .work__count {
+    font-variant-numeric: tabular-nums;
+    color: var(--mute);
+    transition: opacity .35s ease;
+    white-space: nowrap;
+  }
+  .work__count b { font-weight: 600; color: var(--ink); }
+  .work[data-mode="grid"] .work__count { opacity: 0; }
+
+  /* ---------- Layout toggle ---------- */
+  .toggle {
+    position: relative;
+    display: flex;
+    gap: 4px;
+    padding: 0;
+    border-radius: 999px;
+    transition: background-color .4s ease, box-shadow .4s ease, padding .4s ease;
+  }
+  .work[data-mode="grid"] .toggle {
+    background: rgba(255, 255, 255, .82);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .12);
+  }
+  .toggle__pill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40px;
+    height: 30px;
+    border-radius: 999px;
+    background: #1b1b1b;
+    transform: translateX(calc(var(--i, 0) * 44px));
+    transition: transform .55s cubic-bezier(.3, 1.35, .45, 1);
+  }
+  .toggle__btn {
+    position: relative;
+    width: 40px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+    color: #bdbdbd;
+    cursor: pointer;
+    border-radius: 999px;
+    transition: color .3s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .toggle__btn:hover { color: #7c7c7c; }
+  .toggle__btn[aria-pressed="true"] { color: #fff; }
+  .toggle__btn:focus-visible { outline: 2px solid #1b1b1b; outline-offset: 2px; }
+  .toggle__btn svg { width: 14px; height: 14px; display: block; }
+
+  /* ---------- Cards ---------- */
+  .card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100px;
+    height: 66px;
+    border-radius: calc(13px * var(--inv, 1));
+    overflow: hidden;
+    background: var(--c, #ddd);
+    opacity: 0;
+    will-change: transform, opacity;
+    transform-origin: 50% 50%;
+    box-shadow:
+      0 calc(22px * var(--inv, 1)) calc(48px * var(--inv, 1)) calc(-14px * var(--inv, 1)) rgba(0, 0, 0, .28),
+      0 calc(4px * var(--inv, 1)) calc(14px * var(--inv, 1)) rgba(0, 0, 0, .07);
+    backface-visibility: hidden;
+  }
+  .card.is-top { cursor: grab; }
+  .card.is-held { cursor: grabbing; }
+
+  .card img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+    -webkit-user-drag: none;
+  }
+
+  .card::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 58%;
+    background: linear-gradient(to top, rgba(0, 0, 0, .62) 0%, rgba(0, 0, 0, .34) 38%, rgba(0, 0, 0, 0) 100%);
+    pointer-events: none;
+  }
+
+  .card__shade {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: #0c0c0c;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .card__meta {
+    position: absolute;
+    z-index: 2;
+    left: calc(17px * var(--inv, 1));
+    right: calc(40px * var(--inv, 1));
+    bottom: calc(15px * var(--inv, 1));
+    font-size: calc(12.5px * var(--inv, 1));
+    line-height: 1.45;
+    color: #fff;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card__meta span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card__meta span + span { opacity: .66; font-weight: 400; }
+
+  .card__arrow {
+    position: absolute;
+    z-index: 2;
+    top: calc(15px * var(--inv, 1));
+    right: calc(15px * var(--inv, 1));
+    width: calc(11px * var(--inv, 1));
+    height: calc(11px * var(--inv, 1));
+    color: #fff;
+    pointer-events: none;
+    filter: drop-shadow(0 0 calc(3px * var(--inv, 1)) rgba(0, 0, 0, .25));
+  }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 720px) {
+    :root { --pad-x: 20px; --pad-y: 22px; }
+    body { font-size: 12px; }
+    .work__controls { gap: 14px; }
+    .work__hint .is-pointer { display: none; }
+    .work__hint .is-touch { display: inline; }
+  }
+  @media (max-width: 420px) {
+    .work__label { display: none; }
+    .work__hint { max-width: 40vw; line-height: 1.3; }
+  }
+  @media (hover: none) {
+    .work__hint .is-pointer { display: none; }
+    .work__hint .is-touch { display: inline; }
+  }
+</style>
+</head>
+<body>
+
+<section class="work" id="work" data-mode="stack" aria-label="Latest work">
+
+  <header class="work__bar work__bar--top">
+    <span class="work__name">Marvin Schwaibold</span>
+    <span class="work__label">Latest Work — card stack study</span>
+  </header>
+
+  <div class="work__stage" id="stage"></div>
+
+  <footer class="work__bar work__bar--bottom">
+    <span class="work__hint">
+      <span class="is-pointer">Scroll — or grab the top card and throw it</span>
+      <span class="is-touch">Grab the top card and throw it</span>
+    </span>
+
+    <div class="work__controls">
+      <span class="work__count" aria-live="polite"><b id="countNow">01</b> / <span id="countAll">12</span></span>
+
+      <div class="toggle" id="toggle" role="group" aria-label="Layout">
+        <span class="toggle__pill" aria-hidden="true"></span>
+        <button class="toggle__btn" type="button" data-mode="stack" aria-pressed="true" aria-label="Stack view">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.2" y="1.6" width="9.6" height="6.8" rx="1.6"/><path d="M3.6 10.6h6.8M5 12.6h4"/></svg>
+        </button>
+        <button class="toggle__btn" type="button" data-mode="grid" aria-pressed="false" aria-label="Grid view">
+          <svg viewBox="0 0 14 14" fill="currentColor"><rect x="1.6" y="1.6" width="4.6" height="4.6" rx="1.1"/><rect x="7.8" y="1.6" width="4.6" height="4.6" rx="1.1"/><rect x="1.6" y="7.8" width="4.6" height="4.6" rx="1.1"/><rect x="7.8" y="7.8" width="4.6" height="4.6" rx="1.1"/></svg>
+        </button>
+        <button class="toggle__btn" type="button" data-mode="slider" aria-pressed="false" aria-label="Slider view">
+          <svg viewBox="0 0 14 14" fill="currentColor"><rect x="3.6" y="2.6" width="6.8" height="8.8" rx="1.5"/><rect x="0.4" y="4.2" width="1.7" height="5.6" rx=".85"/><rect x="11.9" y="4.2" width="1.7" height="5.6" rx=".85"/></svg>
+        </button>
+      </div>
+    </div>
+  </footer>
+
+</section>
+
+<script>
+(() => {
+  const CDN = 'https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/';
+  const WORK = [
+    { title: 'Shopify Design', sub: 'A new home for design at Shopify', c: '#0a22c2', img: 'hf_20261008_140928_dfb10137-9916-47f4-8789-5527b32744f7.png' },
+    { title: 'Shop', sub: 'The all-in shopping experience', c: '#f6f6f6', img: 'hf_20261008_140930_a8ba69fc-9b03-44f5-800c-618c65bfb5b2.png' },
+    { title: 'July Fund', sub: 'Research-driven capital for the next era', c: '#2c2b2b', img: 'hf_20261008_140929_44e0fc28-20e1-4e9d-994b-b95b31ac9bc4.png' },
+    { title: 'COLLINS', sub: 'The creative agency', c: '#120b0a', img: 'hf_20261008_141005_f3f476ac-00ac-4ffa-ae52-b9dc1a6b6f30.png' },
+    { title: 'Airpods 4', sub: 'Sound made lighter and more effortless', c: '#9a45d6', img: 'hf_20261008_140930_77ba5e8c-ee0f-496b-bbd4-58979b0e7abc.png' },
+    { title: 'Spencer Gabor', sub: 'An expressive portfolio for a visual artist', c: '#f3f3f3', img: 'hf_20261008_140930_9e38e028-bb4f-4e72-820e-d6b9e7bb7600.png' },
+    { title: 'WePresent', sub: 'Stories from the creative internet', c: '#17181a', img: 'hf_20261008_140928_1c3547fa-0d20-42ef-a0dd-40fe5bc8f243.png' },
+    { title: 'Tiny UI: Dissecting today’s most used interfaces', sub: 'Thesis', c: '#f4f4f4', img: 'hf_20261008_141006_12f1fd26-6673-4fc8-a66f-912d63e9e656.png' },
+    { title: 'The Performative Nature of Online Identities', sub: 'Thesis', c: '#a68ac6', img: 'hf_20261008_141005_798f412e-fc74-41e2-aa50-a4e8f33e539d.png' },
+    { title: 'The Complexity of Today’s Web', sub: 'Thesis', c: '#e4e4cf', img: 'hf_20261008_140929_5654c020-ac94-4b2c-ac61-ddfd9a98564b.png' },
+    { title: 'The Strategic Edge of Experimentation', sub: 'Thesis', c: '#2d5586', img: 'hf_20261008_140930_ad0beed7-9d52-46dc-8521-944d7b0ab1cc.png' },
+    { title: 'Primal', sub: 'Branding', c: '#f1f1f1', img: 'hf_20261008_141006_a3e862fe-f154-4047-8d70-b550a6933f70.png' }
+  ];
+
+  const N = WORK.length;
+  const RATIO = 1.5;
+  const section = document.getElementById('work');
+  const stage = document.getElementById('stage');
+  const toggle = document.getElementById('toggle');
+  const countNow = document.getElementById('countNow');
+  document.getElementById('countAll').textContent = String(N).padStart(2, '0');
+
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- state ---------- */
+  const state = {
+    mode: 'stack',
+    active: 0,
+    scroll: { cur: 0, target: 0, max: 0 },
+    pos: { cur: 0, target: 0 },
+    drag: null
+  };
+  const M = {}; // metrics
+
+  /* ---------- build cards ---------- */
+  const cards = WORK.map((w, i) => {
+    const el = document.createElement('article');
+    el.className = 'card';
+    el.style.setProperty('--c', w.c);
+    el.innerHTML =
+      '<img alt="" draggable="false" decoding="async" src="' + CDN + w.img + '">' +
+      '<svg class="card__arrow" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9 9 2M3.6 2H9v5.4"/></svg>' +
+      '<div class="card__meta"><span></span><span></span></div>' +
+      '<div class="card__shade"></div>';
+    el.querySelector('img').alt = w.title;
+    const spans = el.querySelectorAll('.card__meta span');
+    spans[0].textContent = w.title;
+    spans[1].textContent = w.sub;
+    stage.appendChild(el);
+    return {
+      i, el, shadeEl: el.querySelector('.card__shade'),
+      x: 0, y: 0, s: 1, r: 0, o: 0, sh: 0,
+      vx: 0, vy: 0, vs: 0, vr: 0,
+      mode: 'stack', switchAt: 0, startAt: 0,
+      fly: null, held: false,
+      _z: -1, _inv: 0, _top: false
+    };
+  });
+
+  /* ---------- metrics ---------- */
+  function measure() {
+    const vw = stage.clientWidth, vh = stage.clientHeight;
+    const small = vw < 720;
+    M.vw = vw; M.vh = vh;
+    M.cx = vw / 2;
+    M.cy = vh / 2;
+
+    // base (largest) card = slider card
+    M.bw = Math.round(Math.min(small ? vw * 0.78 : vw * 0.48, (vh - (small ? 200 : 230)) * RATIO));
+    M.bw = Math.max(M.bw, 200);
+    M.bh = Math.round(M.bw / RATIO);
+
+    // stack
+    M.stackW = Math.min(small ? vw * 0.8 : vw * 0.388, (vh - (small ? 220 : 260)) * RATIO, M.bw);
+    M.stackW = Math.max(M.stackW, 190);
+    M.stackS = M.stackW / M.bw;
+
+    // slider
+    M.gap = small ? 16 : M.bw * 0.083;
+    M.sideS = 0.89;
+    M.step = M.bw / 2 + M.gap + (M.bw * M.sideS) / 2;
+
+    // grid
+    M.cols = vw >= 900 ? 3 : vw >= 520 ? 2 : 1;
+    M.gPad = Math.max(16, vw * 0.043);
+    M.gGap = Math.max(10, vw * 0.0115);
+    M.gTop = small ? 62 : Math.max(84, vh * 0.132);
+    M.gW = (vw - 2 * M.gPad - (M.cols - 1) * M.gGap) / M.cols;
+    M.gH = M.gW / RATIO;
+    M.gS = M.gW / M.bw;
+    const rows = Math.ceil(N / M.cols);
+    const total = M.gTop + rows * M.gH + (rows - 1) * M.gGap + (small ? 76 : 84);
+    state.scroll.max = Math.max(0, total - vh);
+    state.scroll.target = clamp(state.scroll.target, 0, state.scroll.max);
+    state.scroll.cur = clamp(state.scroll.cur, 0, state.scroll.max);
+
+    for (const c of cards) {
+      c.el.style.width = M.bw + 'px';
+      c.el.style.height = M.bh + 'px';
+    }
+  }
+
+  const depthOf = i => (i - state.active + N) % N;
+
+  // global (un-sprung) offset of a layout: scroll position / slider position
+  function offsetOf(mode) {
+    if (mode === 'grid') return { x: 0, y: -state.scroll.cur };
+    if (mode === 'slider') return { x: -state.pos.cur * M.step, y: 0 };
+    return { x: 0, y: 0 };
+  }
+
+  const T = { x: 0, y: 0, s: 1, o: 1, sh: 0, z: 0 };
+  function target(c) {
+    const i = c.i;
+    if (c.mode === 'grid') {
+      const col = i % M.cols, row = Math.floor(i / M.cols);
+      T.x = M.gPad + col * (M.gW + M.gGap) + M.gW / 2;
+      T.y = M.gTop + row * (M.gH + M.gGap) + M.gH / 2;
+      T.s = M.gS; T.o = 1; T.sh = 0; T.z = 20 + (N - depthOf(i));
+    } else if (c.mode === 'slider') {
+      const d = Math.abs(i - state.pos.cur);
+      T.x = M.cx + i * M.step;
+      T.y = M.cy;
+      T.s = 1 - (1 - M.sideS) * Math.min(1, d);
+      T.o = 1; T.sh = 0; T.z = 40 - Math.round(d);
+    } else {
+      const d = depthOf(i);
+      const dv = Math.min(d, 3);
+      const h = M.stackW / RATIO;
+      const k = 1 - 0.075 * dv;
+      T.s = M.stackS * k;
+      T.x = M.cx;
+      // scaled copies peek out below the top card
+      T.y = M.cy - h * 0.03 + (h * (1 - k)) / 2 + dv * h * 0.028;
+      T.o = d <= 3 ? 1 : 0;
+      T.sh = d === 0 ? 0 : 0.8 + 0.05 * dv;
+      T.z = 60 - d;
+    }
+    return T;
+  }
+
+  /* ---------- mode switching ---------- */
+  function setMode(mode) {
+    if (mode === state.mode) return;
+    const prev = state.mode;
+    endDrag(true);
+    if (prev === 'slider') state.active = clamp(Math.round(state.pos.cur), 0, N - 1);
+    state.mode = mode;
+    section.dataset.mode = mode;
+
+    const now = performance.now();
+    if (mode === 'slider') {
+      state.pos.cur = state.pos.target = state.active;
+    } else if (mode === 'grid') {
+      state.scroll.cur = state.scroll.target = 0;
+    }
+
+    for (const c of cards) {
+      let order;
+      if (mode === 'stack') order = N - 1 - Math.min(depthOf(c.i), N - 1); // back of the deck travels first
+      else order = prev === 'stack' ? depthOf(c.i) : c.i;
+      c.switchAt = now + (reduceMotion ? 0 : order * 26);
+    }
+
+    const btns = toggle.querySelectorAll('.toggle__btn');
+    btns.forEach((b, idx) => {
+      const on = b.dataset.mode === mode;
+      b.setAttribute('aria-pressed', on);
+      if (on) toggle.style.setProperty('--i', idx);
+    });
+    updateCount();
+  }
+
+  toggle.addEventListener('click', e => {
+    const b = e.target.closest('.toggle__btn');
+    if (b) setMode(b.dataset.mode);
+  });
+
+  function updateCount() {
+    countNow.textContent = String(state.active + 1).padStart(2, '0');
+  }
+
+  /* ---------- stack: next / previous ---------- */
+  function throwTop(vx, vy) {
+    const c = cards[state.active];
+    if (c.fly) return;
+    c.held = false;
+    c.el.classList.remove('is-held');
+    c.fly = { vx, vy, vr: clamp(vx * 0.06, -90, 90) + rand(-12, 12), t: 0 };
+    state.active = (state.active + 1) % N;
+    updateCount();
+  }
+
+  function bringBack() {
+    state.active = (state.active - 1 + N) % N;
+    const c = cards[state.active];
+    const h = M.stackW / RATIO;
+    c.fly = null;
+    c.x = M.cx + rand(-0.25, 0.25) * M.stackW;
+    c.y = -h * 0.7;
+    c.r = rand(-16, 16);
+    c.s = M.stackS;
+    c.o = 1; c.sh = 0;
+    c.vx = c.vy = c.vr = c.vs = 0;
+    updateCount();
+  }
+
+  /* ---------- pointer ---------- */
+  function vel(samples) {
+    const n = samples.length;
+    if (n < 2) return { x: 0, y: 0 };
+    const a = samples[0], b = samples[n - 1];
+    const dt = Math.max(16, b.t - a.t) / 1000;
+    return { x: (b.x - a.x) / dt, y: (b.y - a.y) / dt };
+  }
+  function track(d, e) {
+    d.samples.push({ x: e.clientX, y: e.clientY, t: performance.now() });
+    while (d.samples.length > 2 && d.samples[d.samples.length - 1].t - d.samples[0].t > 90) d.samples.shift();
+  }
+  function local(e) {
+    const r = stage.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  stage.addEventListener('pointerdown', e => {
+    if (e.button !== undefined && e.button > 0) return;
+    if (state.drag) return;
+    const p = local(e);
+    const cardEl = e.target.closest('.card');
+    const d = { id: e.pointerId, sx: p.x, sy: p.y, moved: 0, samples: [], kind: state.mode, cardEl };
+    track(d, e);
+
+    if (state.mode === 'stack') {
+      const c = cards[state.active];
+      if (!cardEl || cardEl !== c.el || c.fly || c.mode !== 'stack') return;
+      d.card = c;
+      d.ox = p.x - c.x; d.oy = p.y - c.y;
+      d.dir = d.oy < 0 ? 1 : -1; // grab above centre → card swings with the hand
+      c.held = true;
+      c.el.classList.add('is-held');
+    } else if (state.mode === 'slider') {
+      d.pos0 = state.pos.cur;
+    } else {
+      d.scroll0 = state.scroll.cur;
+    }
+    state.drag = d;
+    section.classList.add('is-dragging');
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+
+  stage.addEventListener('pointermove', e => {
+    const d = state.drag;
+    if (!d || d.id !== e.pointerId) return;
+    const p = local(e);
+    const dx = p.x - d.sx, dy = p.y - d.sy;
+    d.moved = Math.max(d.moved, Math.hypot(dx, dy));
+    track(d, e);
+
+    if (d.kind === 'stack') {
+      const c = d.card;
+      c.x = p.x - d.ox; c.y = p.y - d.oy;
+      c.vx = c.vy = 0;
+    } else if (d.kind === 'slider') {
+      let pos = d.pos0 - dx / M.step;
+      if (pos < 0) pos *= 0.35;
+      if (pos > N - 1) pos = N - 1 + (pos - (N - 1)) * 0.35;
+      state.pos.cur = state.pos.target = pos;
+    } else {
+      let s = d.scroll0 - dy;
+      if (s < 0) s *= 0.35;
+      if (s > state.scroll.max) s = state.scroll.max + (s - state.scroll.max) * 0.35;
+      state.scroll.cur = state.scroll.target = s;
+    }
+  });
+
+  function endDrag(cancel) {
+    const d = state.drag;
+    if (!d) return;
+    state.drag = null;
+    section.classList.remove('is-dragging');
+    try { stage.releasePointerCapture(d.id); } catch (_) {}
+    const v = vel(d.samples);
+
+    if (d.kind === 'stack') {
+      const c = d.card;
+      c.held = false;
+      c.el.classList.remove('is-held');
+      if (cancel) return;
+      const speed = Math.hypot(v.x, v.y);
+      const ox = c.x - M.cx, oy = c.y - M.cy;
+      const dist = Math.hypot(ox, oy);
+      if (speed > 650 || dist > M.stackW * 0.5) {
+        let vx = v.x, vy = v.y;
+        if (speed < 900) { // too slow to leave the screen: push it along its offset
+          const len = dist || 1;
+          vx = (ox / len) * 1500; vy = (oy / len) * 1500;
+          if (dist < 4) { vx = 0; vy = -1500; }
+        }
+        throwTop(vx, vy);
+      } else {
+        c.vx = v.x; c.vy = v.y; // spring back with the release momentum
+      }
+    } else if (d.kind === 'slider') {
+      if (cancel) { state.pos.target = clamp(Math.round(state.pos.cur), 0, N - 1); return; }
+      if (d.moved < 6) {
+        const hit = d.cardEl && cards.find(c => c.el === d.cardEl);
+        if (hit) state.pos.target = hit.i;
+        return;
+      }
+      const proj = state.pos.cur - (v.x * 0.22) / M.step;
+      state.pos.target = clamp(Math.round(proj), 0, N - 1);
+    } else {
+      if (cancel) return;
+      state.scroll.target = clamp(state.scroll.cur - v.y * 0.32, 0, state.scroll.max);
+    }
+  }
+  stage.addEventListener('pointerup', e => { if (state.drag && state.drag.id === e.pointerId) endDrag(false); });
+  stage.addEventListener('pointercancel', e => { if (state.drag && state.drag.id === e.pointerId) endDrag(true); });
+  stage.addEventListener('dragstart', e => e.preventDefault());
+
+  /* ---------- wheel ---------- */
+  let wheelAcc = 0, wheelLock = 0, wheelIdle = 0, snapTimer = 0;
+  section.addEventListener('wheel', e => {
+    e.preventDefault();
+    const unit = e.deltaMode === 1 ? 32 : e.deltaMode === 2 ? M.vh : 1;
+    const dy = e.deltaY * unit, dx = e.deltaX * unit;
+    const now = performance.now();
+
+    if (state.mode === 'grid') {
+      state.scroll.target = clamp(state.scroll.target + dy, 0, state.scroll.max);
+    } else if (state.mode === 'slider') {
+      const d = Math.abs(dx) > Math.abs(dy) ? dx : dy;
+      state.pos.target = clamp(state.pos.target + (d / M.step) * 0.9, -0.2, N - 0.8);
+      clearTimeout(snapTimer);
+      snapTimer = setTimeout(() => {
+        state.pos.target = clamp(Math.round(state.pos.target), 0, N - 1);
+      }, 130);
+    } else {
+      if (now - wheelIdle > 220) wheelAcc = 0;
+      wheelIdle = now;
+      if (now < wheelLock) return;
+      wheelAcc += dy;
+      if (Math.abs(wheelAcc) > 50) {
+        if (wheelAcc > 0) throwTop(rand(-500, 500), -2300);
+        else bringBack();
+        wheelAcc = 0;
+        wheelLock = now + 340;
+      }
+    }
+  }, { passive: false });
+
+  /* ---------- keyboard ---------- */
+  window.addEventListener('keydown', e => {
+    const fwd = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+    const back = e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+    if (!fwd && !back) return;
+    if (state.mode === 'stack') {
+      e.preventDefault();
+      fwd ? throwTop(rand(-500, 500), -2300) : bringBack();
+    } else if (state.mode === 'slider') {
+      e.preventDefault();
+      state.pos.target = clamp(Math.round(state.pos.target) + (fwd ? 1 : -1), 0, N - 1);
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      state.scroll.target = clamp(state.scroll.target + (fwd ? 1 : -1) * M.gH * 0.8, 0, state.scroll.max);
+    }
+  });
+
+  /* ---------- frame loop ---------- */
+  const K = 150, D = 19;   // position / scale spring
+  const KR = 110, DR = 15; // rotation spring
+
+  function spring(c, t, off, dt) {
+    const tx = t.x, ty = t.y;
+    c.vx += ((tx - c.x) * K - c.vx * D) * dt; c.x += c.vx * dt;
+    c.vy += ((ty - c.y) * K - c.vy * D) * dt; c.y += c.vy * dt;
+    c.vs += ((t.s - c.s) * K - c.vs * D) * dt; c.s += c.vs * dt;
+    // cards lean into their travel
+    const lean = clamp(c.vx * 0.011, -16, 16);
+    c.vr += ((lean - c.r) * KR - c.vr * DR) * dt; c.r += c.vr * dt;
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    let dt = Math.min(0.034, (now - last) / 1000);
+    last = now;
+    if (dt <= 0) dt = 0.016;
+
+    // global offsets
+    if (!state.drag || state.drag.kind !== 'grid') {
+      state.scroll.cur += (state.scroll.target - state.scroll.cur) * (1 - Math.exp(-dt * 11));
+    }
+    if (!state.drag || state.drag.kind !== 'slider') {
+      state.pos.cur += (state.pos.target - state.pos.cur) * (1 - Math.exp(-dt * 9));
+    }
+    if (state.mode === 'slider') {
+      const a = clamp(Math.round(state.pos.cur), 0, N - 1);
+      if (a !== state.active) { state.active = a; updateCount(); }
+    }
+
+    for (const c of cards) {
+      if (now < c.startAt) continue;
+
+      // staggered hand-over to the new layout, keeping the visual position continuous
+      if (c.mode !== state.mode && now >= c.switchAt && !c.fly) {
+        const a = offsetOf(c.mode), b = offsetOf(state.mode);
+        c.x += a.x - b.x; c.y += a.y - b.y;
+        c.mode = state.mode;
+        if (!reduceMotion) c.vr += rand(-160, 160);
+      }
+
+      const t = target(c);
+      const off = offsetOf(c.mode);
+      let z = t.z;
+
+      if (c.fly) {
+        const f = c.fly;
+        f.t += dt;
+        c.x += f.vx * dt; c.y += f.vy * dt; c.r += f.vr * dt;
+        f.vy += 900 * dt;
+        z = 200;
+        const w = M.bw * c.s;
+        const gone = c.x < -w || c.x > M.vw + w || c.y < -w || c.y > M.vh + w;
+        if (f.t > 0.38) c.o = Math.max(0, c.o - dt * 5);
+        if (gone || f.t > 0.75) {
+          c.fly = null;
+          const b = target(c);
+          c.x = b.x; c.y = b.y; c.s = b.s; c.r = 0; c.o = 0; c.sh = b.sh;
+          c.vx = c.vy = c.vs = c.vr = 0;
+        }
+      } else if (c.held) {
+        const lean = clamp((c.x - M.cx) * 0.045 * state.drag.dir, -18, 18);
+        c.r += (lean - c.r) * (1 - Math.exp(-dt * 14));
+        c.s += (M.stackS * 1.02 - c.s) * (1 - Math.exp(-dt * 14));
+        z = 200;
+      } else {
+        // two sub-steps keep the spring stable on slow frames
+        spring(c, t, off, dt / 2);
+        spring(c, t, off, dt / 2);
+        const e = 1 - Math.exp(-dt * 9);
+        c.o += (t.o - c.o) * e;
+        c.sh += (t.sh - c.sh) * e;
+      }
+
+      const px = c.x + off.x - M.bw / 2;
+      const py = c.y + off.y - M.bh / 2;
+      c.el.style.transform =
+        'translate3d(' + px.toFixed(2) + 'px,' + py.toFixed(2) + 'px,0) rotate(' + c.r.toFixed(3) + 'deg) scale(' + c.s.toFixed(4) + ')';
+      c.el.style.opacity = c.o < 0.004 ? 0 : c.o.toFixed(3);
+      c.shadeEl.style.opacity = c.sh.toFixed(3);
+
+      if (z !== c._z) { c._z = z; c.el.style.zIndex = z; }
+      const inv = 1 / Math.max(0.2, c.s);
+      if (Math.abs(inv - c._inv) > 0.002) { c._inv = inv; c.el.style.setProperty('--inv', inv.toFixed(3)); }
+      const top = state.mode === 'stack' && c.i === state.active && !c.fly;
+      if (top !== c._top) { c._top = top; c.el.classList.toggle('is-top', top); }
+      c.el.style.pointerEvents = c.o < 0.05 ? 'none' : '';
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- intro: the deck drops in ---------- */
+  function intro() {
+    const now = performance.now();
+    for (const c of cards) {
+      const d = depthOf(c.i);
+      const t = target(c);
+      if (reduceMotion) {
+        c.x = t.x; c.y = t.y; c.s = t.s; c.o = t.o; c.sh = t.sh;
+        continue;
+      }
+      const vis = Math.min(d, 4);
+      c.x = t.x - M.stackW * rand(0.18, 0.34);
+      c.y = t.y - M.vh * rand(0.42, 0.56);
+      c.r = rand(-26, -10);
+      c.s = t.s * 0.82;
+      c.o = 0; c.sh = t.sh;
+      c.startAt = now + 220 + (4 - vis) * 70; // back cards land first, the top card last
+    }
+  }
+
+  /* ---------- boot ---------- */
+  measure();
+  intro();
+  requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
+
+  let rz = 0;
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(rz);
+    rz = requestAnimationFrame(measure);
+  });
+})();
+</script>
+</body>
+</html>
